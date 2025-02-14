@@ -5,12 +5,13 @@ import pygame
 # Initialize Pygame
 pygame.init()
 
-# Disable sound if running on a headless server like Render
-if "RENDER" in os.environ:
-    pygame.mixer.quit()
-else:
-    pygame.mixer.init()
+# Disable sound if running on Render (headless server)
+USE_SOUND = "RENDER" not in os.environ
 
+if USE_SOUND:
+    pygame.mixer.init()
+else:
+    pygame.mixer.quit()
 
 piece_values = {
     chess.PAWN: 100,
@@ -52,11 +53,12 @@ SOUND_DIR = os.path.join(BASE_DIR, "static", "sounds")
 PIECES_DIR = os.path.join(BASE_DIR, "static", "pieces")
 
 # Load sound effects
-move_sound = pygame.mixer.Sound(os.path.join(SOUND_DIR, "move.wav"))
-capture_sound = pygame.mixer.Sound(os.path.join(SOUND_DIR, "capture.wav"))
-check_sound = pygame.mixer.Sound(os.path.join(SOUND_DIR, "check.wav"))
-checkmate_sound = pygame.mixer.Sound(os.path.join(SOUND_DIR, "checkmate.wav"))
-castle_sound = pygame.mixer.Sound(os.path.join(SOUND_DIR, "castle.wav"))
+if USE_SOUND:
+    move_sound = pygame.mixer.Sound(os.path.join(SOUND_DIR, "move.wav"))
+    capture_sound = pygame.mixer.Sound(os.path.join(SOUND_DIR, "capture.wav"))
+    check_sound = pygame.mixer.Sound(os.path.join(SOUND_DIR, "check.wav"))
+    checkmate_sound = pygame.mixer.Sound(os.path.join(SOUND_DIR, "checkmate.wav"))
+    castle_sound = pygame.mixer.Sound(os.path.join(SOUND_DIR, "castle.wav"))
 
 # Initialize chess board
 board = chess.Board()
@@ -93,10 +95,12 @@ def ai_move():
             board.push(best_move)
 
 def play_move_sound(move):
-    """Plays the correct sound effect based on the move type before making the move."""
+    if not USE_SOUND:
+        return  # No sound on Render
+
     move_obj = chess.Move.from_uci(move)
-    target_square = move_obj.to_square  # Square where the piece is moving
-    is_capture = board.piece_at(target_square) is not None  # Check BEFORE move is made
+    target_square = move_obj.to_square
+    is_capture = board.piece_at(target_square) is not None  
 
     if board.is_checkmate():
         checkmate_sound.play()
