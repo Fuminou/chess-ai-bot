@@ -1,0 +1,21 @@
+services:
+  - name: chess-ai-backend
+    type: web
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -b 0.0.0.0:10000 server:app
+    plan: free
+    envVars:
+      - key: PORT
+        value: 10000
+
+  - name: chess-ai-frontend
+    type: static
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: chess-web/build
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        value: "https://chess-ai-backend.onrender.com"
+        plan: free
+        
