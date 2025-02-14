@@ -9,6 +9,11 @@ CORS(app)
 
 board = chess.Board()
 
+@app.route("/")
+def home():
+    return "Chess AI Backend is Running!"
+
+
 @app.route("/set_color", methods=["POST"])
 def set_color():
     """Sets the player's color from frontend."""
@@ -74,4 +79,5 @@ def get_sound(filename):
 # ------------------------- RUN SERVER -------------------------
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))  # Use Render's PORT
     app.run(debug=True)
