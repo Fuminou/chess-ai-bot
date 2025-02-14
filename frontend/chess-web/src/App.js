@@ -101,7 +101,7 @@ function ChessApp() {
 
     return (
         <div className="container">
-            <h1>Chess AI Bot</h1>
+            <h1>Chess AI Bot Project - Joon Yuan Chong</h1>
             <Chessboard 
                 position={fen} 
                 orientation={playerColor === "black" ? "black" : "white"} 
@@ -122,8 +122,6 @@ function ChessApp() {
                     <div className="modal-content">
                         <h2>Checkmate!</h2>
                         <p>{winner}</p>
-                        <button onClick={restartGame}>Restart Game</button>
-                        <button onClick={goBack}>Go Back</button>
                     </div>
                 </div>
             )}
