@@ -18,13 +18,24 @@ def home():
 
 @app.route("/set_color", methods=["POST"])
 def set_color():
-    """Sets the player's color from frontend."""
-    data = request.get_json()
+    """Sets the player color and resets the board."""
+    global board, player_color
+
+    data = request.json
     color = data.get("color")
-    if color in ["white", "black"]:
-        chess_ai.set_player_color(color)
-        return jsonify({"status": "success", "fen": chess_ai.get_board_fen()})
-    return jsonify({"status": "error", "message": "Invalid color"}), 400
+
+    if color not in ["white", "black"]:
+        return jsonify({"error": "Invalid color"}), 400
+
+    # Reset board and set player color
+    board = chess.Board()
+    player_color = chess.WHITE if color == "white" else chess.BLACK
+
+    # If AI is playing White, it makes the first move
+    if player_color == chess.BLACK:
+        ai_move()
+
+    return jsonify({"fen": board.fen()})
 
 
 # ------------------------- GAME ROUTES -------------------------

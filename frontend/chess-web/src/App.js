@@ -3,30 +3,35 @@ import Chessboard from "chessboardjsx";
 import axios from "axios";
 import "./App.css";
 
-//Load sound files
-const moveSound = new Audio("/sounds/move.wav");
-const captureSound = new Audio("/sounds/capture.wav");
-const checkSound = new Audio("/sounds/check.wav");
-const checkmateSound = new Audio("/sounds/checkmate.wav");
-const castleSound = new Audio("/sounds/castle.wav");
-
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:5000";
 
-const playMoveSound = (move, isCheckmate, isCheck, isCapture, isAICapture, isCastling, isAICastling) => {
-  if (isCheckmate) {
-      new Audio("/sounds/checkmate.wav").play();
-  } else if (isCheck) {
-      new Audio("/sounds/check.wav").play();
-  } else if (isCastling || isAICastling) { 
-      new Audio("/sounds/castle.wav").play();
-  } else if (isCapture || isAICapture) { 
-      new Audio("/sounds/capture.wav").play();
-  } else {
-      new Audio("/sounds/move.wav").play();
+function playSound(type) {
+  let sound = "";
+  switch (type) {
+      case "move":
+          sound = "move.wav";
+          break;
+      case "capture":
+          sound = "capture.wav";
+          break;
+      case "check":
+          sound = "check.wav";
+          break;
+      case "checkmate":
+          sound = "checkmate.wav";
+          break;
+      case "castle":
+          sound = "castle.wav";
+          break;
+      default:
+          return;
   }
-};
 
+  const audio = new Audio(`/sounds/${sound}`);
+  audio.volume = 1.0; // Set volume
+  audio.play().catch(e => console.error("Audio Play Error:", e));
+}
 
 
 function ChessApp() {
@@ -67,15 +72,18 @@ function ChessApp() {
       }
   };
   
-    const restartGame = async () => {
-        try {
-            const response = await axios.post(`${API_URL}/set_color`, { color: playerColor });
-            setFen(response.data.fen);
-            setIsCheckmate(false);
-        } catch (error) {
-            console.error("Error restarting game:", error);
-        }
-    };
+  const restartGame = async () => {
+    if (!playerColor) return;
+
+    try {
+        const response = await axios.post(`${API_URL}/set_color`, { color: playerColor });
+        setFen(response.data.fen);
+        setIsCheckmate(false);
+        setWinner("");
+    } catch (error) {
+        console.error("Error restarting game:", error);
+    }
+};
 
     const goBack = () => {
         setPlayerColor(null);
@@ -88,23 +96,39 @@ function ChessApp() {
   
       try {
           const response = await axios.post(`${API_URL}/player_move`, { move });
+          setFen(response.data.fen);
   
-          setFen(response.data.fen); 
+          //Play correct sound effect
+          if (response.data.checkmate) {
+              playSound("checkmate");
+              setIsCheckmate(true);
+              setWinner(playerColor === "white" ? "Black Wins!" : "White Wins!");
+          } else if (response.data.check) {
+              playSound("check");
+          } else if (response.data.capture) {
+              playSound("capture");
+          } else if (response.data.castling) {
+              playSound("castling");
+          } else {
+              playSound("move");
+          }
   
-          //Pass correct sound data
-          playMoveSound(
-              move,
-              response.data.checkmate,
-              response.data.check,
-              response.data.capture,    
-              response.data.ai_capture,  
-              response.data.castling,    
-              response.data.ai_castling 
-          );
-  
+          //Play AI move sounds with delay
+          if (response.data.ai_last_move) {
+              setTimeout(() => {
+                  if (response.data.ai_capture) {
+                      playSound("capture");
+                  } else if (response.data.ai_castling) {
+                      playSound("castling");
+                  } else {
+                      playSound("move");
+                  }
+              }, 1); // Delay for AI move
+          }
       } catch (error) {
-          console.error("Illegal move detected:", error.response?.data || error);
+          console.error("Illegal move");
       }
+  
       setSelectedSquare(null);
   };
   
