@@ -4,7 +4,13 @@ import pygame
 
 # Initialize Pygame
 pygame.init()
-pygame.mixer.init()
+
+# Disable sound if running on a headless server like Render
+if "RENDER" in os.environ:
+    pygame.mixer.quit()
+else:
+    pygame.mixer.init()
+
 
 piece_values = {
     chess.PAWN: 100,
