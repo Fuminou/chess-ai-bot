@@ -53,19 +53,19 @@ function ChessApp() {
     };
 
     const fetchBoard = async () => {
-        try {
-            const response = await axios.get(`${API_URL}/get_board`);
-            setFen(response.data.fen);
-            
-            if (response.data.checkmate) {
-                setIsCheckmate(true);
-                setWinner(playerColor === "white" ? "Black Wins!" : "White Wins!");
-            }
-        } catch (error) {
-            console.error("Error fetching board:", error);
-        }
-    };
-
+      try {
+          const response = await axios.get(`${API_URL}/get_board`);
+          setFen(response.data.fen);
+  
+          if (response.data.checkmate) {
+              setIsCheckmate(true);
+              setWinner(playerColor === "white" ? "Black Wins!" : "White Wins!");
+          }
+      } catch (error) {
+          console.error("Error fetching board:", error);
+      }
+  };
+  
     const restartGame = async () => {
         try {
             const response = await axios.post(`${API_URL}/set_color`, { color: playerColor });
@@ -84,24 +84,28 @@ function ChessApp() {
 
     //Handles both click and drag moves
     const makeMove = async (move) => {
-        if (!playerColor || isCheckmate) return;
-        try {
-            const response = await axios.post(`${API_URL}/player_move`, { move });
-            //Play sound based on move type
-            playMoveSound(
+      if (!playerColor || isCheckmate) return;
+  
+      try {
+          const response = await axios.post(`${API_URL}/player_move`, { move });
+  
+          playMoveSound(
               move, 
               response.data.checkmate, 
               response.data.check, 
               response.data.capture, 
               response.data.castle
           );
-            setFen(response.data.fen);
-            fetchBoard();
-        } catch (error) {
-            console.log("Illegal move");
-        }
-        setSelectedSquare(null); // Reset selection
-    };
+  
+          setFen(response.data.fen);
+          await fetchBoard();
+  
+      } catch (error) {
+          console.error("Illegal move:", error);
+      }
+      setSelectedSquare(null);
+  };
+  
 
     //Click-Based Movement Handling
     const handleSquareClick = async (square) => {

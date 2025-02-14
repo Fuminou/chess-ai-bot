@@ -54,17 +54,16 @@ def player_move():
     is_capture = board.is_capture(move)
     board.push(move)
 
-    # Check for checkmate, check, castling
     is_checkmate = board.is_checkmate()
     is_check = board.is_check()
-    is_castle = abs(move.from_square - move.to_square) == 2  # Castling detection
+    is_castle = abs(move.from_square - move.to_square) == 2
 
-    # AI move (if game is not over)
+    # AI move if game is not over
     if not is_checkmate and not board.is_game_over():
         ai_move()
-    
+
     return jsonify({
-        "fen": board.fen(),
+        "fen": board.fen(),  #Return updated board state
         "checkmate": is_checkmate,
         "check": is_check,
         "capture": is_capture,
