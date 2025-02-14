@@ -13,19 +13,20 @@ const castleSound = new Audio("/sounds/castle.wav");
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:5000";
 
-const playMoveSound = (move, checkmate, check, capture, castle) => {
-  if (checkmate) {
-      checkmateSound.play();
-  } else if (check) {
-      checkSound.play();
-  } else if (capture) {
-      captureSound.play();
-  } else if (castle) {
-      castleSound.play();
+const playMoveSound = (move, isCheckmate, isCheck, isCapture, isAICapture, isCastling, isAICastling) => {
+  if (isCheckmate) {
+      new Audio("/sounds/checkmate.wav").play();
+  } else if (isCheck) {
+      new Audio("/sounds/check.wav").play();
+  } else if (isCastling || isAICastling) { 
+      new Audio("/sounds/castle.wav").play();
+  } else if (isCapture || isAICapture) { 
+      new Audio("/sounds/capture.wav").play();
   } else {
-      moveSound.play();
+      new Audio("/sounds/move.wav").play();
   }
 };
+
 
 
 function ChessApp() {
@@ -82,29 +83,31 @@ function ChessApp() {
         setIsCheckmate(false);
     };
 
-    //Handles both click and drag moves
     const makeMove = async (move) => {
       if (!playerColor || isCheckmate) return;
   
       try {
           const response = await axios.post(`${API_URL}/player_move`, { move });
   
+          setFen(response.data.fen); 
+  
+          //Pass correct sound data
           playMoveSound(
-              move, 
-              response.data.checkmate, 
-              response.data.check, 
-              response.data.capture, 
-              response.data.castle
+              move,
+              response.data.checkmate,
+              response.data.check,
+              response.data.capture,    
+              response.data.ai_capture,  
+              response.data.castling,    
+              response.data.ai_castling 
           );
   
-          setFen(response.data.fen);
-          await fetchBoard();
-  
       } catch (error) {
-          console.error("Illegal move:", error);
+          console.error("Illegal move detected:", error.response?.data || error);
       }
       setSelectedSquare(null);
   };
+  
   
 
     //Click-Based Movement Handling

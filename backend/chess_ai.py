@@ -115,8 +115,7 @@ def play_move_sound(move):
 
 def is_castling(move):
     """Checks if a move is a castling move."""
-    move_obj = chess.Move.from_uci(move)
-    return abs(move_obj.from_square - move_obj.to_square) == 2
+    return abs(move.from_square - move.to_square) == 2
 
 def get_best_move(board, depth=3):
     """Returns the best move using Minimax with Alpha-Beta Pruning."""

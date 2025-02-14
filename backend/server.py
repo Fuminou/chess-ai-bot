@@ -3,6 +3,8 @@ from flask_cors import CORS
 import chess
 import os
 import chess_ai  # Import AI logic
+get_best_move = chess_ai.get_best_move
+is_castling = chess_ai.is_castling
 
 app = Flask(__name__, static_folder="static")
 CORS(app)
@@ -44,6 +46,7 @@ def get_board():
 
 @app.route("/player_move", methods=["POST"])
 def player_move():
+    global board
     data = request.get_json()
     move_uci = data.get("move")
 
@@ -51,24 +54,39 @@ def player_move():
         return jsonify({"error": "Illegal move"}), 400
 
     move = chess.Move.from_uci(move_uci)
+    
+    #Check if move is a capture or castling
     is_capture = board.is_capture(move)
-    board.push(move)
+    is_castle = is_castling(chess.Move.from_uci(move_uci))
+    board.push(move)  #Push move to board
 
     is_checkmate = board.is_checkmate()
     is_check = board.is_check()
-    is_castle = abs(move.from_square - move.to_square) == 2
 
-    # AI move if game is not over
+    ai_move_uci = None
+    ai_capture = False
+    ai_castle = False
+
     if not is_checkmate and not board.is_game_over():
-        ai_move()
+        best_move = get_best_move(board)
+        if best_move:
+            ai_capture = board.is_capture(best_move) 
+            ai_castle = is_castling(best_move) 
+            ai_move_uci = best_move.uci()
+            board.push(best_move)
 
     return jsonify({
-        "fen": board.fen(),  #Return updated board state
+        "fen": board.fen(),
         "checkmate": is_checkmate,
         "check": is_check,
-        "capture": is_capture,
-        "castle": is_castle
+        "capture": is_capture,  
+        "ai_capture": ai_capture, 
+        "castling": is_castle, 
+        "ai_castling": ai_castle,  
+        "last_move": move_uci,
+        "ai_last_move": ai_move_uci
     })
+
 
 @app.route("/ai_move", methods=["GET"])
 def ai_move():
