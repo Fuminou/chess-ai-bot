@@ -3,7 +3,30 @@ import Chessboard from "chessboardjsx";
 import axios from "axios";
 import "./App.css";
 
+//Load sound files
+const moveSound = new Audio("/sounds/move.wav");
+const captureSound = new Audio("/sounds/capture.wav");
+const checkSound = new Audio("/sounds/check.wav");
+const checkmateSound = new Audio("/sounds/checkmate.wav");
+const castleSound = new Audio("/sounds/castle.wav");
+
+
 const API_URL = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:5000";
+
+const playMoveSound = (move, checkmate, check, capture, castle) => {
+  if (checkmate) {
+      checkmateSound.play();
+  } else if (check) {
+      checkSound.play();
+  } else if (capture) {
+      captureSound.play();
+  } else if (castle) {
+      castleSound.play();
+  } else {
+      moveSound.play();
+  }
+};
+
 
 function ChessApp() {
     const [fen, setFen] = useState("start");
@@ -59,11 +82,19 @@ function ChessApp() {
         setIsCheckmate(false);
     };
 
-    // ✅ Handles both click and drag moves
+    //Handles both click and drag moves
     const makeMove = async (move) => {
         if (!playerColor || isCheckmate) return;
         try {
             const response = await axios.post(`${API_URL}/player_move`, { move });
+            //Play sound based on move type
+            playMoveSound(
+              move, 
+              response.data.checkmate, 
+              response.data.check, 
+              response.data.capture, 
+              response.data.castle
+          );
             setFen(response.data.fen);
             fetchBoard();
         } catch (error) {
@@ -72,7 +103,7 @@ function ChessApp() {
         setSelectedSquare(null); // Reset selection
     };
 
-    // ✅ Click-Based Movement Handling
+    //Click-Based Movement Handling
     const handleSquareClick = async (square) => {
         if (!playerColor || isCheckmate) return;
 
@@ -84,7 +115,7 @@ function ChessApp() {
         }
     };
 
-    // ✅ Drag-and-Drop Movement Handling
+    //Drag-and-Drop Movement Handling
     const onDrop = async ({ sourceSquare, targetSquare }) => {
         await makeMove(sourceSquare + targetSquare);
     };
@@ -105,10 +136,10 @@ function ChessApp() {
             <Chessboard 
                 position={fen} 
                 orientation={playerColor === "black" ? "black" : "white"} 
-                onSquareClick={handleSquareClick} // ✅ Click-based movement
-                onDrop={onDrop} // ✅ Drag-and-drop movement
+                onSquareClick={handleSquareClick} //Click-based movement
+                onDrop={onDrop} //Drag-and-drop movement
                 squareStyles={{
-                    [selectedSquare]: { backgroundColor: "rgba(255, 255, 0, 0.5)" } // ✅ Highlight selected piece
+                    [selectedSquare]: { backgroundColor: "rgba(255, 255, 0, 0.5)" } //Highlight selected piece
                 }}
             />
             <div className="buttons">
@@ -116,7 +147,7 @@ function ChessApp() {
                 <button onClick={goBack}>Go Back</button>
             </div>
 
-            {/* ✅ Checkmate Modal Pop-up */}
+            {/*Checkmate Modal Pop-up */}
             {isCheckmate && (
                 <div className="modal">
                     <div className="modal-content">
