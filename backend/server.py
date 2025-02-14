@@ -44,14 +44,32 @@ def get_board():
 
 @app.route("/player_move", methods=["POST"])
 def player_move():
-    """Handles player moves."""
     data = request.get_json()
-    move = data.get("move")
+    move_uci = data.get("move")
+
+    if move_uci not in [m.uci() for m in board.legal_moves]:
+        return jsonify({"error": "Illegal move"}), 400
+
+    move = chess.Move.from_uci(move_uci)
+    is_capture = board.is_capture(move)
+    board.push(move)
+
+    # Check for checkmate, check, castling
+    is_checkmate = board.is_checkmate()
+    is_check = board.is_check()
+    is_castle = abs(move.from_square - move.to_square) == 2  # Castling detection
+
+    # AI move (if game is not over)
+    if not is_checkmate and not board.is_game_over():
+        ai_move()
     
-    if chess_ai.make_move(move):
-        chess_ai.ai_move()  # AI responds after player's move
-        return jsonify({"fen": chess_ai.get_board_fen()})
-    return jsonify({"error": "Invalid move"}), 400
+    return jsonify({
+        "fen": board.fen(),
+        "checkmate": is_checkmate,
+        "check": is_check,
+        "capture": is_capture,
+        "castle": is_castle
+    })
 
 @app.route("/ai_move", methods=["GET"])
 def ai_move():
