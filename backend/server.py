@@ -9,8 +9,6 @@ is_castling = chess_ai.is_castling
 app = Flask(__name__, static_folder="static")
 CORS(app)
 
-board = chess.Board()
-
 @app.route("/")
 def home():
     return "Chess AI Backend is Running!"
@@ -19,23 +17,16 @@ def home():
 @app.route("/set_color", methods=["POST"])
 def set_color():
     """Sets the player color and resets the board."""
-    global board, player_color
-
     data = request.json
     color = data.get("color")
 
     if color not in ["white", "black"]:
         return jsonify({"error": "Invalid color"}), 400
 
-    # Reset board and set player color
-    board = chess.Board()
-    player_color = chess.WHITE if color == "white" else chess.BLACK
-
-    # If AI is playing White, it makes the first move
-    if player_color == chess.BLACK:
-        ai_move()
-
-    return jsonify({"fen": board.fen()})
+    # Use the AI module's function to set color and reset board
+    chess_ai.set_player_color(color)
+    
+    return jsonify({"fen": chess_ai.get_board_fen()})
 
 
 # ------------------------- GAME ROUTES -------------------------
@@ -43,9 +34,9 @@ def set_color():
 @app.route("/new_game", methods=["POST"])
 def new_game():
     """Resets the chess game."""
-    global board
-    board = chess.Board()
-    return jsonify({"message": "Game restarted", "fen": board.fen()})
+    chess_ai.board = chess.Board()
+    chess_ai.transposition_table.clear()
+    return jsonify({"message": "Game restarted", "fen": chess_ai.board.fen()})
 
 @app.route("/get_board", methods=["GET"])
 def get_board():
@@ -57,58 +48,117 @@ def get_board():
 
 @app.route("/player_move", methods=["POST"])
 def player_move():
-    global board
     data = request.get_json()
     move_uci = data.get("move")
 
-    if move_uci not in [m.uci() for m in board.legal_moves]:
+    # Check if this is a promotion move without actually making it
+    if len(move_uci) == 4:  # Basic move without promotion
+        move = chess.Move.from_uci(move_uci)
+        if (chess_ai.board.piece_at(move.from_square) and 
+            chess_ai.board.piece_at(move.from_square).piece_type == chess.PAWN and
+            ((move.to_square >= 56 and chess_ai.board.turn == chess.WHITE) or 
+             (move.to_square <= 7 and chess_ai.board.turn == chess.BLACK))):
+            # This is a promotion move, return promotion flag
+            return jsonify({
+                "fen": chess_ai.board.fen(),
+                "promotion": True,
+                "move": move_uci
+            })
+    
+    # For non-promotion moves, proceed normally
+    if move_uci not in [m.uci() for m in chess_ai.board.legal_moves]:
         return jsonify({"error": "Illegal move"}), 400
 
     move = chess.Move.from_uci(move_uci)
     
     #Check if move is a capture or castling
-    is_capture = board.is_capture(move)
+    is_capture = chess_ai.board.is_capture(move)
     is_castle = is_castling(chess.Move.from_uci(move_uci))
-    board.push(move)  #Push move to board
+    chess_ai.board.push(move)  #Push move to board
 
-    is_checkmate = board.is_checkmate()
-    is_check = board.is_check()
-
-    ai_move_uci = None
-    ai_capture = False
-    ai_castle = False
-
-    if not is_checkmate and not board.is_game_over():
-        best_move = get_best_move(board)
-        if best_move:
-            ai_capture = board.is_capture(best_move) 
-            ai_castle = is_castling(best_move) 
-            ai_move_uci = best_move.uci()
-            board.push(best_move)
+    is_checkmate = chess_ai.board.is_checkmate()
+    is_check = chess_ai.board.is_check()
 
     return jsonify({
-        "fen": board.fen(),
+        "fen": chess_ai.board.fen(),
         "checkmate": is_checkmate,
         "check": is_check,
         "capture": is_capture,  
-        "ai_capture": ai_capture, 
-        "castling": is_castle, 
-        "ai_castling": ai_castle,  
-        "last_move": move_uci,
-        "ai_last_move": ai_move_uci
+        "castling": is_castle,
+        "promotion": False,
+        "last_move": move_uci
     })
 
+
+@app.route("/promote", methods=["POST"])
+def promote():
+    """Handles pawn promotion."""
+    data = request.get_json()
+    move_uci = data.get("move")
+    promotion_piece = data.get("promotion", "q")
+    
+    # Create the full move with promotion
+    full_move_uci = move_uci + promotion_piece
+    
+    if full_move_uci not in [m.uci() for m in chess_ai.board.legal_moves]:
+        return jsonify({"error": "Illegal promotion move"}), 400
+    
+    move = chess.Move.from_uci(full_move_uci)
+    chess_ai.board.push(move)
+    
+    is_checkmate = chess_ai.board.is_checkmate()
+    is_check = chess_ai.board.is_check()
+    
+    return jsonify({
+        "fen": chess_ai.board.fen(),
+        "checkmate": is_checkmate,
+        "check": is_check,
+        "promotion": True,
+        "promoted_piece": promotion_piece
+    })
 
 @app.route("/ai_move", methods=["GET"])
 def ai_move():
     """Handles AI move using Minimax from chess_ai.py."""
-    global board
-    if board.is_game_over():
-        return jsonify({"status": "game over", "message": board.result()})
+    if chess_ai.board.is_game_over():
+        return jsonify({
+            "status": "game over", 
+            "message": chess_ai.board.result(),
+            "fen": chess_ai.board.fen()
+        })
 
-    move = chess_ai.get_best_move(board)
-    board.push(move)
-    return jsonify({"status": "success", "move": move.uci(), "fen": board.fen()})
+    # Get AI move
+    best_move = chess_ai.get_best_move(chess_ai.board)
+    
+    if not best_move:
+        return jsonify({
+            "status": "no move", 
+            "message": "No legal moves available",
+            "fen": chess_ai.board.fen()
+        })
+    
+    # Check move properties before making it
+    is_capture = chess_ai.board.is_capture(best_move)
+    is_castle = chess_ai.is_castling(best_move)
+    is_promotion = best_move.promotion is not None
+    
+    # Make the AI move
+    chess_ai.board.push(best_move)
+    
+    # Check game state after AI move
+    is_checkmate = chess_ai.board.is_checkmate()
+    is_check = chess_ai.board.is_check()
+    
+    return jsonify({
+        "status": "success",
+        "move": best_move.uci(),
+        "fen": chess_ai.board.fen(),
+        "checkmate": is_checkmate,
+        "check": is_check,
+        "capture": is_capture,
+        "castling": is_castle,
+        "promotion": is_promotion
+    })
 
 # ------------------------- STATIC FILES -------------------------
 

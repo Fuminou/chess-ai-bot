@@ -40,6 +40,8 @@ function ChessApp() {
     const [isCheckmate, setIsCheckmate] = useState(false);
     const [winner, setWinner] = useState("");
     const [selectedSquare, setSelectedSquare] = useState(null);
+    const [showPromotionModal, setShowPromotionModal] = useState(false);
+    const [pendingMove, setPendingMove] = useState(null);
 
     useEffect(() => {
         if (playerColor) {
@@ -95,42 +97,130 @@ function ChessApp() {
       if (!playerColor || isCheckmate) return;
   
       try {
-          const response = await axios.post(`${API_URL}/player_move`, { move });
-          setFen(response.data.fen);
+          // Step 1: Make the player's move
+          const playerResponse = await axios.post(`${API_URL}/player_move`, { move });
+          
+          // Check if this move requires promotion
+          if (playerResponse.data.promotion) {
+              setPendingMove(move);
+              setShowPromotionModal(true);
+              return;
+          }
+          
+          // Update board with player's move immediately
+          setFen(playerResponse.data.fen);
   
-          //Play correct sound effect
-          if (response.data.checkmate) {
+          // Play player move sound
+          if (playerResponse.data.checkmate) {
               playSound("checkmate");
               setIsCheckmate(true);
-              setWinner(playerColor === "white" ? "Black Wins!" : "White Wins!");
-          } else if (response.data.check) {
+              setWinner("Checkmate! You won against the bot! 🎉");
+              setSelectedSquare(null);
+              return;
+          } else if (playerResponse.data.check) {
               playSound("check");
-          } else if (response.data.capture) {
+          } else if (playerResponse.data.capture) {
               playSound("capture");
-          } else if (response.data.castling) {
+          } else if (playerResponse.data.castling) {
               playSound("castling");
           } else {
               playSound("move");
           }
-  
-          //Play AI move sounds with delay
-          if (response.data.ai_last_move) {
-              setTimeout(() => {
-                  if (response.data.ai_capture) {
-                      playSound("capture");
-                  } else if (response.data.ai_castling) {
-                      playSound("castling");
-                  } else {
-                      playSound("move");
+          
+          // Step 2: Get AI move after a short delay
+          setTimeout(async () => {
+              try {
+                  const aiResponse = await axios.get(`${API_URL}/ai_move`);
+                  
+                  if (aiResponse.data.status === "success") {
+                      // Update board with AI move
+                      setFen(aiResponse.data.fen);
+                      
+                      // Play AI move sound
+                      if (aiResponse.data.checkmate) {
+                          playSound("checkmate");
+                          setIsCheckmate(true);
+                          setWinner("Checkmate! You lost to the bot! 🤖");
+                      } else if (aiResponse.data.check) {
+                          playSound("check");
+                      } else if (aiResponse.data.capture) {
+                          playSound("capture");
+                      } else if (aiResponse.data.castling) {
+                          playSound("castling");
+                      } else {
+                          playSound("move");
+                      }
                   }
-              }, 1); // Delay for AI move
-          }
+              } catch (error) {
+                  console.error("Error getting AI move:", error);
+              }
+          }, 500); // 500ms delay before AI moves
+          
       } catch (error) {
           console.error("Illegal move");
       }
   
       setSelectedSquare(null);
   };
+
+    const handlePromotion = async (promotionPiece) => {
+        if (!pendingMove) return;
+        
+        try {
+            // Step 1: Handle promotion move
+            const promotionResponse = await axios.post(`${API_URL}/promote`, { 
+                move: pendingMove, 
+                promotion: promotionPiece 
+            });
+            
+            setFen(promotionResponse.data.fen);
+            setShowPromotionModal(false);
+            setPendingMove(null);
+            
+            // Play promotion sound
+            playSound("move");
+            
+            // Check for checkmate after promotion
+            if (promotionResponse.data.checkmate) {
+                playSound("checkmate");
+                setIsCheckmate(true);
+                setWinner("Checkmate! You won against the bot! 🎉");
+                return;
+            }
+            
+            // Step 2: Get AI move after promotion
+            setTimeout(async () => {
+                try {
+                    const aiResponse = await axios.get(`${API_URL}/ai_move`);
+                    
+                    if (aiResponse.data.status === "success") {
+                        // Update board with AI move
+                        setFen(aiResponse.data.fen);
+                        
+                        // Play AI move sound
+                        if (aiResponse.data.checkmate) {
+                            playSound("checkmate");
+                            setIsCheckmate(true);
+                            setWinner("Checkmate! You lost to the bot! 🤖");
+                        } else if (aiResponse.data.check) {
+                            playSound("check");
+                        } else if (aiResponse.data.capture) {
+                            playSound("capture");
+                        } else if (aiResponse.data.castling) {
+                            playSound("castling");
+                        } else {
+                            playSound("move");
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error getting AI move after promotion:", error);
+                }
+            }, 500); // 500ms delay before AI moves
+            
+        } catch (error) {
+            console.error("Error promoting pawn:", error);
+        }
+    };
   
   
 
@@ -182,8 +272,54 @@ function ChessApp() {
             {isCheckmate && (
                 <div className="modal">
                     <div className="modal-content">
-                        <h2>Checkmate!</h2>
-                        <p>{winner}</p>
+                        <h2>Game Over!</h2>
+                        <p className={winner.includes("lost to the bot") ? "bot-win" : winner.includes("won against the bot") ? "player-win" : ""}>
+                            {winner}
+                        </p>
+                        <button 
+                            className="close-button" 
+                            onClick={() => {
+                                setIsCheckmate(false);
+                                setWinner("");
+                            }}
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/*Promotion Modal */}
+            {showPromotionModal && (
+                <div className="modal">
+                    <div className="modal-content">
+                        <h2>Choose Promotion Piece</h2>
+                        <div className="promotion-pieces">
+                            <button 
+                                className="promotion-piece" 
+                                onClick={() => handlePromotion('q')}
+                            >
+                                ♕ Queen
+                            </button>
+                            <button 
+                                className="promotion-piece" 
+                                onClick={() => handlePromotion('r')}
+                            >
+                                ♖ Rook
+                            </button>
+                            <button 
+                                className="promotion-piece" 
+                                onClick={() => handlePromotion('b')}
+                            >
+                                ♗ Bishop
+                            </button>
+                            <button 
+                                className="promotion-piece" 
+                                onClick={() => handlePromotion('n')}
+                            >
+                                ♘ Knight
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
