@@ -3,7 +3,7 @@ services:
     type: web
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -b 0.0.0.0:10000 server:app
+    startCommand: gunicorn --chdir backend server:app --workers 2 --threads 2 --timeout 120 --keep-alive 5 --bind 0.0.0.0:$PORT
     plan: free
     envVars:
       - key: PORT
